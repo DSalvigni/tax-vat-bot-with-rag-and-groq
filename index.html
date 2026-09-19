@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAT & Tax AI Assistant</title>
+    <style>
+        :root {
+            --bg-dark: #121218;
+            --sidebar-bg: #1e1e28;
+            --card-bg: #282836;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --text-light: #f3f4f6;
+            --text-muted: #9ca3af;
+            --danger: #ef4444;
+            --border: #374151;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-light); height: 100vh; overflow: hidden; }
+
+        /* Login Screen */
+        #login-screen {
+            display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;
+        }
+        .login-card {
+            background: var(--sidebar-bg); padding: 2rem; border-radius: 12px; border: 1px solid var(--border);
+            width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 1rem;
+        }
+        .login-card h2 { text-align: center; margin-bottom: 0.5rem; }
+        .input-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .input-group label { font-size: 0.85rem; color: var(--text-muted); }
+        input[type="text"], input[type="password"] {
+            padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-dark); color: white;
+        }
+
+        /* Main Dashboard */
+        #dashboard { display: none; height: 100vh; width: 100vw; }
+        #sidebar {
+            width: 300px; background: var(--sidebar-bg); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 1rem; gap: 1rem;
+        }
+        #chat-main { flex: 1; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Buttons & Controls */
+        button {
+            padding: 0.75rem 1rem; border-radius: 6px; border: none; background: var(--primary);
+            color: white; font-weight: 600; cursor: pointer; transition: background 0.2s;
+        }
+        button:hover { background: var(--primary-hover); }
+        .btn-new { background: #10b981; width: 100%; }
+        .btn-new:hover { background: #059669; }
+        
+        .btn-logout { 
+            background: transparent; 
+            border: 1px solid var(--border); 
+            color: var(--text-muted); 
+            padding: 0.5rem 0.8rem;
+            font-size: 0.85rem;
+        }
+        .btn-logout:hover { background: var(--danger); color: white; border-color: var(--danger); }
+
+        /* History List */
+        .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+        .history-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem;
+            background: var(--card-bg); border-radius: 6px; cursor: pointer; border: 1px solid transparent;
+        }
+        .history-item:hover, .history-item.active { border-color: var(--primary); }
+        .history-info { display: flex; flex-direction: column; gap: 0.2rem; overflow: hidden; }
+        .history-title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .history-date { font-size: 0.7rem; color: var(--text-muted); }
+        .btn-del-chat { background: transparent; color: var(--text-muted); padding: 0.2rem 0.4rem; }
+        .btn-del-chat:hover { color: var(--danger); background: transparent; }
+
+        /* User Footer Container */
+        .sidebar-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            gap: 0.5rem;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            overflow: hidden;
+        }
+        .user-icon { font-size: 1.2rem; }
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+            overflow: hidden;
+        }
+        .user-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        #logged-username {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Indicatore di caricamento RAG / ChromaDB */
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-style: italic;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            width: fit-content;
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--text-muted);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Chat Window */
+        #chat-window { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+        .message { max-width: 75%; padding: 0.9rem 1.2rem; border-radius: 8px; line-height: 1.5; white-space: pre-wrap; font-size: 0.95rem; }
+        .message.user { align-self: flex-end; background: var(--primary); color: white; }
+        .message.assistant { align-self: flex-start; background: var(--card-bg); border: 1px solid var(--border); }
+        
+        /* Input Area Form */
+        #input-form { padding: 1rem; background: var(--sidebar-bg); border-top: 1px solid var(--border); display: flex; gap: 0.75rem; }
+        #user-input { flex: 1; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-dark); color: white; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+        <form class="login-card" onsubmit="handleLogin(event)">
+            <h2>🔐 VAT Tax AI</h2>
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <p id="login-err" style="color: var(--danger); font-size: 0.8rem;" class="hidden">Credenziali non valide</p>
+            <button type="submit">Accedi</button>
+        </form>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboard">
+        <aside id="sidebar">
+            <button class="btn-new" onclick="startNewChat()">➕ Nuova Chat</button>
+            <div class="history-list" id="history-container"></div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <span class="user-icon">👤</span>
+                    <div class="user-details">
+                        <span class="user-label">Utente loggato</span>
+                        <strong id="logged-username">...</strong>
+                    </div>
+                </div>
+                <button class="btn-logout" onclick="logout()" title="Disconnettiti">Esci 🚪</button>
+            </div>
+        </aside>
+
+        <main id="chat-main">
+            <header style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--sidebar-bg);">
+                <h3>🇪🇺🇬🇧 VAT & Tax Assistant</h3>
+            </header>
+            <div id="chat-window"></div>
+            <form id="input-form" onsubmit="sendMessage(event)">
+                <input type="text" id="user-input" placeholder="Chiedi spiegazioni su normativa IVA o fiscale..." autocomplete="off">
+                <button type="submit">Invia</button>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        let authHeader = sessionStorage.getItem("auth") || "";
+        let currentChatId = "";
+        let messages = [];
+
+        if (authHeader) showDashboard();
+
+        function getAuthHeaders() {
+            return {
+                "Authorization": authHeader,
+                "Content-Type": "application/json"
+            };
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById("username").value;
+            const p = document.getElementById("password").value;
+            const token = "Basic " + btoa(u + ":" + p);
+
+            const res = await fetch("/api/chats", { headers: { "Authorization": token } });
+            if (res.ok) {
+                authHeader = token;
+                sessionStorage.setItem("auth", authHeader);
+                document.getElementById("login-err").classList.add("hidden");
+                showDashboard();
+            } else {
+                document.getElementById("login-err").classList.remove("hidden");
+            }
+        }
+
+        function logout() {
+            sessionStorage.clear();
+            location.reload();
+        }
+
+        function showDashboard() {
+            document.getElementById("login-screen").classList.add("hidden");
+            document.getElementById("dashboard").style.display = "flex";
+            loadHistory();
+            loadLoggedUser();
+        }
+
+        async function loadLoggedUser() {
+            try {
+                const res = await fetch("/api/me", { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById("logged-username").textContent = data.username;
+                }
+            } catch (err) {
+                console.error("Errore recupero utente:", err);
+            }
+        }
+
+        async function loadHistory() {
+            const res = await fetch("/api/chats", { headers: getAuthHeaders() });
+            if (!res.ok) return logout();
+            const chats = await res.json();
+            
+            const container = document.getElementById("history-container");
+            container.innerHTML = "";
+
+            chats.forEach(c => {
+                const item = document.createElement("div");
+                item.className = `history-item ${c.id === currentChatId ? 'active' : ''}`;
+                item.onclick = () => loadChat(c.id);
+                item.innerHTML = `
+                    <div class="history-info">
+                        <span class="history-title">${escapeHtml(c.title)}</span>
+                        <span class="history-date">${c.date}</span>
+                    </div>
+                    <button class="btn-del-chat" onclick="deleteChat(event, '${c.id}')">🗑️</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function appendMessage(role, content) {
+            const win = document.getElementById("chat-window");
+            const div = document.createElement("div");
+            div.className = `message ${role}`;
+            div.textContent = content;
+            win.appendChild(div);
+            win.scrollTop = win.scrollHeight;
+        }
+
+        function renderMessages() {
+            const win = document.getElementById("chat-window");
+            win.innerHTML = "";
+            messages.forEach(m => {
+                if (m.role === 'system') return;
+                appendMessage(m.role, m.content);
+            });
+        }
+
+        function startNewChat() {
+            currentChatId = "";
+            messages = [];
+            renderMessages();
+            loadHistory();
+        }
+
+        async function loadChat(id) {
+            currentChatId = id;
+            const res = await fetch(`/api/chat/${id}`, { headers: getAuthHeaders() });
+            if (res.ok) {
+                messages = await res.json();
+                renderMessages();
+                loadHistory();
+            }
+        }
+
+        async function sendMessage(event) {
+            if (event) event.preventDefault();
+
+            const inputField = document.getElementById("user-input");
+            const prompt = inputField.value.trim();
+            if (!prompt) return;
+
+            // 1. Mostra il messaggio utente e azzera il campo di testo
+            appendMessage("user", prompt);
+            inputField.value = "";
+
+            // 2. Aggiungi l'indicatore di caricamento nel container 'chat-window'
+            const loaderId = "loader-" + Date.now();
+            const chatWindow = document.getElementById("chat-window");
+            
+            const loaderDiv = document.createElement("div");
+            loaderDiv.id = loaderId;
+            loaderDiv.className = "message assistant";
+            loaderDiv.innerHTML = `
+                <div class="typing-indicator">
+                    <div class="spinner"></div>
+                    <span>Ricerca nel database vettoriale (ChromaDB) e generazione risposta...</span>
+                </div>
+            `;
+            chatWindow.appendChild(loaderDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            try {
+                // 3. Esegui la chiamata API con l'header di autenticazione e lo storico corretto
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        history: messages,
+                        chat_id: currentChatId
+                    })
+                });
+
+                const data = await response.json();
+
+                // 4. Rimuovi il loader
+                const activeLoader = document.getElementById(loaderId);
+                if (activeLoader) activeLoader.remove();
+
+                // 5. Aggiorna la chat con la risposta vera
+                if (data && data.messages) {
+                    messages = data.messages;
+                    const lastMsg = messages[messages.length - 1];
+                    appendMessage("assistant", lastMsg.content);
+                    currentChatId = data.id;
+                    loadHistory();
+                }
+            } catch (error) {
+                console.error("Errore durante l'invio:", error);
+                const activeLoader = document.getElementById(loaderId);
+                if (activeLoader) {
+                    activeLoader.innerHTML = `<span style="color: var(--danger);">Errore durante la generazione della risposta.</span>`;
+                }
+            }
+        }
+
+        async function deleteChat(e, id) {
+            e.stopPropagation();
+            if (!confirm("Eliminare questa conversazione?")) return;
+            
+            await fetch(`/api/chat/${id}`, { method: "DELETE", headers: getAuthHeaders() });
+            if (currentChatId === id) startNewChat();
+            else loadHistory();
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+        }
+    </script>
+</body>
+</html>
